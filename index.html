@@ -49,6 +49,12 @@ input,select,button{font:inherit;color:inherit}
 .card:active{transform:scale(.97)}
 .card .nm{font-family:var(--display);font-weight:700;font-size:1.1rem;line-height:1.15;overflow-wrap:anywhere}
 .card .no{font-family:var(--mono);font-size:.72rem;opacity:.85;letter-spacing:.04em}
+.card .top{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{flex:none;width:38px;height:38px;border-radius:9px;background:#fff;display:grid;place-items:center;overflow:hidden;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);font-family:var(--display);font-weight:800;color:#17202b;font-size:1rem}
+.logo img{width:30px;height:30px;object-fit:contain}
+.scan .logo{width:72px;height:72px;border-radius:16px;font-size:1.8rem}
+.scan .logo img{width:58px;height:58px}
 .card .tag{position:absolute;top:10px;right:10px;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;background:rgba(0,0,0,.25);padding:2px 7px;border-radius:99px}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px}
 .empty h2{font-family:var(--display);font-size:1.2rem;margin:0}
@@ -125,6 +131,9 @@ label span.hint{font-weight:400;color:var(--muted);font-size:.8rem}
     <label for="fName">Sklep / program
       <input class="field" id="fName" required maxlength="40" placeholder="np. Biedronka Moja Biedronka">
     </label>
+    <label for="fSite">Strona sklepu <span class="hint">Do pobrania logo. Popularne sklepy uzupełnią się same.</span>
+      <input class="field" id="fSite" inputmode="url" autocomplete="off" autocapitalize="off" placeholder="np. rossmann.pl">
+    </label>
     <label for="fNum">Numer karty <span class="hint">Przepisz cyfry spod kodu kreskowego</span>
       <input class="field mono" id="fNum" required inputmode="numeric" autocomplete="off" placeholder="2900123456789">
     </label>
@@ -152,6 +161,7 @@ label span.hint{font-weight:400;color:var(--muted);font-size:.8rem}
 </div>
 
 <div class="scan" id="scan" hidden>
+  <div class="logo" id="sLogo"></div>
   <h2 id="sName"></h2>
   <div class="code">
     <svg id="bar"></svg>
@@ -175,9 +185,38 @@ label span.hint{font-weight:400;color:var(--muted);font-size:.8rem}
 <script>
 const COLORS=[["#d81e2c","#fff"],["#f2c200","#1a1a1a"],["#1d8a3c","#fff"],["#0a4fb3","#fff"],["#6b2fb0","#fff"],["#e8670c","#fff"],["#111827","#fff"],["#0f8f8a","#fff"],["#c2185b","#fff"],["#8a6d3b","#fff"]];
 const EXAMPLES=[
-  {id:"ex1",name:"Przykład: Drogeria",num:"5901234123457",type:"EAN13",color:0,ex:true},
-  {id:"ex2",name:"Przykład: Stacja paliw",num:"LOY-88231",type:"CODE128",color:3,ex:true}];
+  {id:"ex1",name:"Przykład: Rossmann",site:"rossmann.pl",num:"5901234123457",type:"EAN13",color:0,ex:true},
+  {id:"ex2",name:"Przykład: Orlen",site:"orlen.pl",num:"LOY-88231",type:"CODE128",color:3,ex:true}];
 const LS="portfel-kart-v1";
+const SHOPS=[["biedronka","biedronka.pl"],["lidl","lidl.pl"],["żabka","zabka.pl"],["zabka","zabka.pl"],["rossmann","rossmann.pl"],
+["hebe","hebe.pl"],["kaufland","kaufland.pl"],["carrefour","carrefour.pl"],["auchan","auchan.pl"],["stokrotka","stokrotka.pl"],
+["netto","netto.pl"],["dino","marketdino.pl"],["intermarch","intermarche.pl"],["polomarket","polomarket.pl"],["lewiatan","lewiatan.pl"],
+["delikatesy centrum","delikatesy.pl"],["makro","makro.pl"],["selgros","selgros.pl"],["orlen","orlen.pl"],["circle k","circlek.pl"],
+["shell","shell.pl"],["bp","bp.com"],["moya","moyastacja.pl"],["empik","empik.com"],["decathlon","decathlon.pl"],["ikea","ikea.com"],
+["leroy","leroymerlin.pl"],["castorama","castorama.pl"],["obi","obi.pl"],["mrówka","mrowka.pl"],["jysk","jysk.pl"],
+["media markt","mediamarkt.pl"],["mediamarkt","mediamarkt.pl"],["euro","euro.com.pl"],["x-kom","x-kom.pl"],["super-pharm","superpharm.pl"],
+["superpharm","superpharm.pl"],["douglas","douglas.pl"],["sephora","sephora.pl"],["notino","notino.pl"],["pepco","pepco.pl"],["action","action.com"],
+["smyk","smyk.com"],["h&m","hm.com"],["reserved","reserved.com"],["sinsay","sinsay.com"],["ccc","ccc.eu"],["deichmann","deichmann.com"],
+["4f","4f.com.pl"],["gemini","gemini.pl"],["doz","doz.pl"],["ziko","zikoapteka.pl"],["dr.max","drmax.pl"],["dr max","drmax.pl"],
+["mcdonald","mcdonalds.pl"],["kfc","kfc.pl"],["starbucks","starbucks.pl"],["costa","costacoffee.pl"],["burger king","burgerking.pl"],
+["pizza hut","pizzahut.pl"],["multikino","multikino.pl"],["cinema city","cinema-city.pl"],["helios","helios.pl"],["payback","payback.pl"],
+["inpost","inpost.pl"],["allegro","allegro.pl"],["eobuwie","eobuwie.pl"],["zalando","zalando.pl"],["tchibo","tchibo.pl"],["kik","kik.de"],
+["half price","halfprice.eu"],["tk maxx","tkmaxx.com"],["primark","primark.com"],["apart","apart.pl"],["yes","yes.pl"],["w.kruk","wkruk.pl"]];
+function guessSite(name){const n=name.toLowerCase();let best=null;
+  for(const [k,d] of SHOPS){const re=new RegExp("(^|[^a-ząćęłńóśźż0-9])"+k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"($|[^a-ząćęłńóśźż0-9])");
+    if(re.test(n)&&(!best||k.length>best[0].length))best=[k,d]}
+  return best?best[1]:""}
+function cleanSite(v){return (v||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/^www\./,"").split(/[\/?#\s]/)[0]}
+function logoEl(c,el){el=el||document.createElement("div");el.className="logo";el.textContent="";
+  const ini=(c.name.replace(/^przykład:\s*/i,"").match(/[\p{L}\p{N}]/u)||["?"])[0].toUpperCase();
+  const site=cleanSite(c.site);
+  if(!site){el.textContent=ini;return el}
+  const img=new Image();img.alt="";img.referrerPolicy="no-referrer";let step=0;
+  const srcs=["https://www.google.com/s2/favicons?sz=128&domain="+encodeURIComponent(site),"https://icons.duckduckgo.com/ip3/"+encodeURIComponent(site)+".ico"];
+  img.onerror=()=>{step++;if(step<srcs.length)img.src=srcs[step];else{img.remove();el.textContent=ini}};
+  img.onload=()=>{if(img.naturalWidth<=16&&step===0){step++;img.src=srcs[1]}};
+  img.src=srcs[0];el.append(img);return el}
+let siteTouched=false;
 let cards=[],store=null,editing=null,current=null,pickColor=0,wake=null;
 const $=id=>document.getElementById(id);
 
@@ -192,7 +231,7 @@ function tile(c){const [bg,fg]=COLORS[c.color%COLORS.length];
   b.style.setProperty("--c",bg);b.style.setProperty("--fg",fg);
   const nm=document.createElement("div");nm.className="nm";nm.textContent=c.name;
   const no=document.createElement("div");no.className="no";no.textContent=c.num.length>16?c.num.slice(0,14)+"…":c.num;
-  b.append(nm,no);
+  const top=document.createElement("div");top.className="top";top.append(logoEl(c),nm);b.append(top,no);
   if(c.ex){const t=document.createElement("span");t.className="tag";t.textContent="przykład";b.append(t)}
   b.onclick=()=>openScan(c);return b;}
 
@@ -213,7 +252,7 @@ function render(){
 async function openScan(c){
   current=c;const [bg,fg]=COLORS[c.color%COLORS.length];
   const s=$("scan");s.style.setProperty("--c",bg);s.style.setProperty("--fg",fg);
-  $("sName").textContent=c.name;$("sNum").textContent=c.num;
+  $("sName").textContent=c.name;logoEl(c,$("sLogo"));$("sNum").textContent=c.num;
   $("sNote").hidden=!c.note;$("sNote").textContent=c.note||"";
   $("edit").hidden=$("del").hidden=!!c.ex;$("confirmDel").hidden=true;$("scanActions").hidden=false;
   const bar=$("bar"),qr=$("qr");qr.textContent="";
@@ -231,7 +270,7 @@ function closeScan(){$("scan").hidden=true;current=null;try{wake?.release()}catc
 
 function openForm(c){
   editing=c||null;$("formTitle").textContent=c?"Edytuj kartę":"Nowa karta";
-  $("fName").value=c?.name||"";$("fNum").value=c?.num||"";$("fType").value=c?.type||"auto";$("fNote").value=c?.note||"";
+  $("fName").value=c?.name||"";$("fSite").value=c?.site||"";siteTouched=!!c?.site;$("fNum").value=c?.num||"";$("fType").value=c?.type||"auto";$("fNote").value=c?.note||"";
   pickColor=c?c.color:(cards.length%COLORS.length);drawSwatches();$("fErr").hidden=true;$("formSheet").hidden=false;
   setTimeout(()=>$("fName").focus(),50);
 }
@@ -247,15 +286,17 @@ function validate(num,type){
   return"";}
 
 $("form").addEventListener("submit",e=>{e.preventDefault();
-  const name=$("fName").value.trim(),num=$("fNum").value.replace(/\s+/g,""),type=$("fType").value,note=$("fNote").value.trim();
+  const name=$("fName").value.trim(),num=$("fNum").value.replace(/\s+/g,""),type=$("fType").value,note=$("fNote").value.trim(),site=cleanSite($("fSite").value);
   const err=!name?"Wpisz nazwę sklepu.":!num?"Wpisz numer karty.":validate(num,type);
   if(err){$("fErr").textContent=err;$("fErr").hidden=false;return}
-  const c=editing?Object.assign({},editing,{name,num,type,note,color:pickColor})
-                 :{id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,num,type,note,color:pickColor,added:Date.now(),used:0};
+  const c=editing?Object.assign({},editing,{name,num,type,note,site,color:pickColor})
+                 :{id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,num,type,note,site,color:pickColor,added:Date.now(),used:0};
   cards=cards.filter(x=>x.id!==c.id).concat(c);persist(c);
   $("formSheet").hidden=true;
   if(editing&&current){closeScan();openScan(c)}else render();
 });
+$("fName").addEventListener("input",()=>{if(!siteTouched)$("fSite").value=guessSite($("fName").value)});
+$("fSite").addEventListener("input",()=>{siteTouched=$("fSite").value.trim()!==""});
 $("cancel").onclick=()=>$("formSheet").hidden=true;
 $("formSheet").addEventListener("click",e=>{if(e.target.id==="formSheet")$("formSheet").hidden=true});
 $("addBtn").onclick=()=>openForm();
