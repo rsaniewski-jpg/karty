@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f5eff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Karty">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Portfel Kart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+html{-webkit-text-size-adjust:100%}body{margin:0}[hidden]{display:none!important}
+/* Layout: one narrow column like a phone wallet; cards stack as plastic tiles, tap opens a full-screen scan view */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --ink:#17202b; --muted:#5d6876; --line:#d8dde4;
+  --accent:#1f5eff; --accent-ink:#ffffff; --danger:#c8362c;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Figtree",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10141a; --surface:#1a2029; --ink:#e9edf2; --muted:#98a3b2; --line:#2b3441;
+  --accent:#6b93ff; --accent-ink:#0b1020; --danger:#ff7a6e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10141a; --surface:#1a2029; --ink:#e9edf2; --muted:#98a3b2; --line:#2b3441;
+  --accent:#6b93ff; --accent-ink:#0b1020; --danger:#ff7a6e; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 96px}
+.wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:800;font-size:2rem;line-height:1.05;margin:0;letter-spacing:-.02em;text-wrap:balance}
+.count{color:var(--muted);font-size:.9rem;margin:4px 0 0}
+.sync{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+input,select,button{font:inherit;color:inherit}
+.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:360px){.grid{grid-template-columns:1fr}}
+.card{position:relative;aspect-ratio:1.586;max-width:100%;border:0;border-radius:14px;padding:14px;text-align:left;cursor:pointer;
+  display:flex;flex-direction:column;justify-content:space-between;color:var(--fg,#fff);background:var(--c,#333);
+  box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 6px 14px -8px rgba(0,0,0,.5);overflow:hidden;transition:transform .15s}
+.card::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.18),transparent 45%);pointer-events:none}
+.card:active{transform:scale(.97)}
+.card .nm{font-family:var(--display);font-weight:700;font-size:1.1rem;line-height:1.15;overflow-wrap:anywhere}
+.card .no{font-family:var(--mono);font-size:.72rem;opacity:.85;letter-spacing:.04em}
+.card .tag{position:absolute;top:10px;right:10px;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;background:rgba(0,0,0,.25);padding:2px 7px;border-radius:99px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.empty h2{font-family:var(--display);font-size:1.2rem;margin:0}
+.empty p{margin:0;color:var(--muted)}
+.empty .grid{opacity:.95}
+.fab{position:fixed;right:calc(max(16px,env(safe-area-inset-right,0px)) + 4px);bottom:calc(env(safe-area-inset-bottom,0px) + 20px);
+  border:0;border-radius:99px;padding:14px 22px;background:var(--accent);color:var(--accent-ink);font-weight:600;
+  box-shadow:0 8px 20px -8px rgba(0,0,0,.45);cursor:pointer}
+.sheet{position:fixed;inset:0;background:rgba(10,14,20,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.panel{background:var(--surface);width:100%;max-width:520px;border-radius:20px 20px 0 0;max-height:92vh;overflow:auto;
+  padding-block:20px calc(env(safe-area-inset-bottom,0px) + 20px);padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:14px}
+.panel h2{font-family:var(--display);margin:0;font-size:1.4rem}
+label{display:flex;flex-direction:column;gap:6px;font-size:.85rem;font-weight:600}
+label span.hint{font-weight:400;color:var(--muted);font-size:.8rem}
+.field{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+.mono{font-family:var(--mono)}
+.swatches{display:flex;flex-wrap:wrap;gap:8px}
+.sw{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;background:var(--c)}
+.sw[aria-pressed="true"]{border-color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn{flex:1;padding:13px 16px;border-radius:12px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.danger.solid{background:var(--danger);color:#fff}
+.err{color:var(--danger);font-size:.85rem;margin:0}
+/* scan view: always white so scanners read it in either theme */
+.scan{position:fixed;inset:0;z-index:30;background:var(--c);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  padding-block:calc(env(safe-area-inset-top,0px) + 20px) calc(env(safe-area-inset-bottom,0px) + 20px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));color:var(--fg)}
+.scan h2{font-family:var(--display);font-weight:800;font-size:1.8rem;margin:0;text-align:center;text-wrap:balance}
+.code{background:#fff;color:#000;border-radius:16px;padding:20px;width:100%;max-width:440px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.code svg{width:100%;height:auto;max-height:180px}
+.code #qr img,.code #qr canvas{width:220px!important;height:220px!important}
+.code .num{font-family:var(--mono);font-size:1.15rem;letter-spacing:.08em;color:#000;text-align:center;overflow-wrap:anywhere}
+.scan .note{max-width:440px;text-align:center;opacity:.9;margin:0}
+.scan .row{width:100%;max-width:440px}
+.scan .btn{border-color:currentColor;color:inherit}
+.backup{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-top:8px}
+.backup summary{cursor:pointer;font-weight:600}
+.backup p{color:var(--muted);font-size:.9rem;margin:10px 0}
+.backup .msg{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.card{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Portfel Kart</h1>
+      <p class="count" id="count">Wczytuję karty…</p>
+    </div>
+    <span class="sync" id="sync"></span>
+  </header>
+  <input class="search" id="q" type="search" placeholder="Szukaj sklepu…" aria-label="Szukaj karty" hidden>
+  <div id="list"></div>
+  <details class="backup">
+    <summary>Kopia zapasowa</summary>
+    <p>Karty są zapisane tylko w tym telefonie. Zrób kopię przed zmianą telefonu albo czyszczeniem przeglądarki.</p>
+    <div class="row">
+      <button class="btn" type="button" id="exp">Zapisz kopię do pliku</button>
+      <label class="btn" for="imp" style="flex-direction:row;justify-content:center;font-size:1rem">Wczytaj kopię<input id="imp" type="file" accept=".json,application/json" hidden></label>
+    </div>
+    <p class="msg" id="bMsg" hidden></p>
+  </details>
+</div>
+
+<button class="fab" id="addBtn" type="button">+ Dodaj kartę</button>
+
+<div class="sheet" id="formSheet" hidden>
+  <form class="panel" id="form" novalidate>
+    <h2 id="formTitle">Nowa karta</h2>
+    <label for="fName">Sklep / program
+      <input class="field" id="fName" required maxlength="40" placeholder="np. Biedronka Moja Biedronka">
+    </label>
+    <label for="fNum">Numer karty <span class="hint">Przepisz cyfry spod kodu kreskowego</span>
+      <input class="field mono" id="fNum" required inputmode="numeric" autocomplete="off" placeholder="2900123456789">
+    </label>
+    <label for="fType">Typ kodu <span class="hint">Najczęściej EAN-13 (13 cyfr). Gdy kasa nie czyta, spróbuj Code 128.</span>
+      <select class="field" id="fType">
+        <option value="auto">Wykryj automatycznie</option>
+        <option value="EAN13">EAN-13</option>
+        <option value="EAN8">EAN-8</option>
+        <option value="CODE128">Code 128</option>
+        <option value="CODE39">Code 39</option>
+        <option value="QR">Kod QR</option>
+      </select>
+    </label>
+    <label for="fNote">Notatka <span class="hint">Opcjonalnie: PIN, e-mail konta, punkty</span>
+      <input class="field" id="fNote" maxlength="80">
+    </label>
+    <div><div style="font-size:.85rem;font-weight:600;margin-bottom:8px">Kolor karty</div>
+      <div class="swatches" id="swatches"></div></div>
+    <p class="err" id="fErr" hidden></p>
+    <div class="row">
+      <button class="btn" type="button" id="cancel">Anuluj</button>
+      <button class="btn primary" type="submit" id="save">Zapisz</button>
+    </div>
+  </form>
+</div>
+
+<div class="scan" id="scan" hidden>
+  <h2 id="sName"></h2>
+  <div class="code">
+    <svg id="bar"></svg>
+    <div id="qr" hidden></div>
+    <div class="num" id="sNum"></div>
+  </div>
+  <p class="note" id="sNote" hidden></p>
+  <div class="row" id="scanActions">
+    <button class="btn" type="button" id="close">Zamknij</button>
+    <button class="btn" type="button" id="edit">Edytuj</button>
+    <button class="btn" type="button" id="del">Usuń</button>
+  </div>
+  <div class="row" id="confirmDel" hidden>
+    <button class="btn" type="button" id="noDel">Zostaw</button>
+    <button class="btn danger solid" type="button" id="yesDel">Usuń na zawsze</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const COLORS=[["#d81e2c","#fff"],["#f2c200","#1a1a1a"],["#1d8a3c","#fff"],["#0a4fb3","#fff"],["#6b2fb0","#fff"],["#e8670c","#fff"],["#111827","#fff"],["#0f8f8a","#fff"],["#c2185b","#fff"],["#8a6d3b","#fff"]];
+const EXAMPLES=[
+  {id:"ex1",name:"Przykład: Drogeria",num:"5901234123457",type:"EAN13",color:0,ex:true},
+  {id:"ex2",name:"Przykład: Stacja paliw",num:"LOY-88231",type:"CODE128",color:3,ex:true}];
+const LS="portfel-kart-v1";
+let cards=[],store=null,editing=null,current=null,pickColor=0,wake=null;
+const $=id=>document.getElementById(id);
+
+function lsGet(){try{return JSON.parse(localStorage.getItem(LS)||"[]")}catch(e){return []}}
+function lsSet(){try{localStorage.setItem(LS,JSON.stringify(cards))}catch(e){}}
+
+function detect(n){const d=/^\d+$/.test(n);
+  if(d&&n.length===13)return"EAN13"; if(d&&n.length===8)return"EAN8"; return"CODE128";}
+
+function tile(c){const [bg,fg]=COLORS[c.color%COLORS.length];
+  const b=document.createElement("button");b.type="button";b.className="card";
+  b.style.setProperty("--c",bg);b.style.setProperty("--fg",fg);
+  const nm=document.createElement("div");nm.className="nm";nm.textContent=c.name;
+  const no=document.createElement("div");no.className="no";no.textContent=c.num.length>16?c.num.slice(0,14)+"…":c.num;
+  b.append(nm,no);
+  if(c.ex){const t=document.createElement("span");t.className="tag";t.textContent="przykład";b.append(t)}
+  b.onclick=()=>openScan(c);return b;}
+
+function render(){
+  const q=$("q").value.trim().toLowerCase(),L=$("list");L.textContent="";
+  $("q").hidden=cards.length<5;
+  $("count").textContent=cards.length?`${cards.length} ${cards.length===1?"karta":(cards.length%10>=2&&cards.length%10<=4&&(cards.length%100<10||cards.length%100>=20))?"karty":"kart"}`:"Jeszcze nic tu nie ma";
+  if(!cards.length){
+    const e=document.createElement("div");e.className="empty";
+    e.innerHTML='<h2>Dodaj pierwszą kartę</h2><p>Kliknij „Dodaj kartę” i przepisz numer spod kodu kreskowego. Przy kasie otwierasz kartę, a kasjer skanuje kod z ekranu.</p><p>Tak to będzie wyglądać (dotknij, żeby zobaczyć):</p>';
+    const g=document.createElement("div");g.className="grid";EXAMPLES.forEach(c=>g.append(tile(c)));e.append(g);L.append(e);return;}
+  const g=document.createElement("div");g.className="grid";
+  cards.filter(c=>!q||c.name.toLowerCase().includes(q)).sort((a,b)=>(b.used||0)-(a.used||0)||a.name.localeCompare(b.name,"pl"))
+    .forEach(c=>g.append(tile(c)));
+  L.append(g);
+}
+
+async function openScan(c){
+  current=c;const [bg,fg]=COLORS[c.color%COLORS.length];
+  const s=$("scan");s.style.setProperty("--c",bg);s.style.setProperty("--fg",fg);
+  $("sName").textContent=c.name;$("sNum").textContent=c.num;
+  $("sNote").hidden=!c.note;$("sNote").textContent=c.note||"";
+  $("edit").hidden=$("del").hidden=!!c.ex;$("confirmDel").hidden=true;$("scanActions").hidden=false;
+  const bar=$("bar"),qr=$("qr");qr.textContent="";
+  let type=c.type==="auto"?detect(c.num):c.type;
+  if(type==="QR"||!window.JsBarcode){bar.style.display="none";qr.hidden=false;
+    if(window.QRCode)new QRCode(qr,{text:c.num,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});}
+  else{qr.hidden=true;bar.style.display="";
+    try{JsBarcode(bar,c.num,{format:type,displayValue:false,margin:0,height:110,width:2.6})}
+    catch(e){JsBarcode(bar,c.num,{format:"CODE128",displayValue:false,margin:0,height:110,width:2.2})}}
+  s.hidden=false;
+  try{wake=await navigator.wakeLock?.request("screen")}catch(e){}
+  if(!c.ex){c.used=Date.now();persist(c,true)}
+}
+function closeScan(){$("scan").hidden=true;current=null;try{wake?.release()}catch(e){}wake=null;render()}
+
+function openForm(c){
+  editing=c||null;$("formTitle").textContent=c?"Edytuj kartę":"Nowa karta";
+  $("fName").value=c?.name||"";$("fNum").value=c?.num||"";$("fType").value=c?.type||"auto";$("fNote").value=c?.note||"";
+  pickColor=c?c.color:(cards.length%COLORS.length);drawSwatches();$("fErr").hidden=true;$("formSheet").hidden=false;
+  setTimeout(()=>$("fName").focus(),50);
+}
+function drawSwatches(){const w=$("swatches");w.textContent="";
+  COLORS.forEach(([bg],i)=>{const b=document.createElement("button");b.type="button";b.className="sw";
+    b.style.setProperty("--c",bg);b.setAttribute("aria-label","Kolor "+(i+1));b.setAttribute("aria-pressed",i===pickColor);
+    b.onclick=()=>{pickColor=i;drawSwatches()};w.append(b)})}
+
+function validate(num,type){
+  if(type==="EAN13"&&!/^\d{12,13}$/.test(num))return"EAN-13 ma 13 cyfr. Sprawdź numer albo wybierz Code 128.";
+  if(type==="EAN8"&&!/^\d{7,8}$/.test(num))return"EAN-8 ma 8 cyfr. Sprawdź numer albo wybierz Code 128.";
+  if(type==="CODE39"&&!/^[0-9A-Z\-. $\/+%]+$/i.test(num))return"Code 39 przyjmuje tylko cyfry, litery i - . $ / + %.";
+  return"";}
+
+$("form").addEventListener("submit",e=>{e.preventDefault();
+  const name=$("fName").value.trim(),num=$("fNum").value.replace(/\s+/g,""),type=$("fType").value,note=$("fNote").value.trim();
+  const err=!name?"Wpisz nazwę sklepu.":!num?"Wpisz numer karty.":validate(num,type);
+  if(err){$("fErr").textContent=err;$("fErr").hidden=false;return}
+  const c=editing?Object.assign({},editing,{name,num,type,note,color:pickColor})
+                 :{id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name,num,type,note,color:pickColor,added:Date.now(),used:0};
+  cards=cards.filter(x=>x.id!==c.id).concat(c);persist(c);
+  $("formSheet").hidden=true;
+  if(editing&&current){closeScan();openScan(c)}else render();
+});
+$("cancel").onclick=()=>$("formSheet").hidden=true;
+$("formSheet").addEventListener("click",e=>{if(e.target.id==="formSheet")$("formSheet").hidden=true});
+$("addBtn").onclick=()=>openForm();
+$("q").oninput=render;
+$("close").onclick=closeScan;
+$("edit").onclick=()=>openForm(current);
+$("del").onclick=()=>{$("scanActions").hidden=true;$("confirmDel").hidden=false};
+$("noDel").onclick=()=>{$("scanActions").hidden=false;$("confirmDel").hidden=true};
+$("yesDel").onclick=()=>{const id=current.id;cards=cards.filter(x=>x.id!==id);remove(id);closeScan()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("formSheet").hidden)$("formSheet").hidden=true;else if(!$("scan").hidden)closeScan()}});
+
+function persist(c,quiet){lsSet();if(!quiet)render()}
+function remove(id){lsSet()}
+$("exp").onclick=()=>{
+  const blob=new Blob([JSON.stringify({app:"portfel-kart",version:1,saved:new Date().toISOString(),cards},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="karty-kopia-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  msg("Zapisano plik z "+cards.length+" kartami. Znajdziesz go w Pobranych.")};
+$("imp").onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  try{const d=JSON.parse(await f.text());const list=Array.isArray(d)?d:d.cards;
+    if(!Array.isArray(list))throw 0;let n=0;
+    list.forEach(c=>{if(c&&c.id&&c.name&&c.num){cards=cards.filter(x=>x.id!==c.id).concat(c);n++}});
+    lsSet();render();msg("Wczytano "+n+" kart.")}
+  catch(err){msg("Ten plik to nie jest kopia portfela. Wybierz plik karty-kopia-….json.")}
+  e.target.value=""};
+function msg(t){$("bMsg").textContent=t;$("bMsg").hidden=false}
+cards=lsGet();render();
+$("sync").textContent="";
+try{navigator.storage?.persist?.()}catch(e){}
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+
+</body>
+</html>
