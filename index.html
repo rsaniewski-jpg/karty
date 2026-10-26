@@ -50,11 +50,13 @@ input,select,button{font:inherit;color:inherit}
 .card .nm{font-family:var(--display);font-weight:700;font-size:1.1rem;line-height:1.15;overflow-wrap:anywhere}
 .card .no{font-family:var(--mono);font-size:.72rem;opacity:.85;letter-spacing:.04em}
 .card .top{display:flex;align-items:center;gap:10px;min-width:0}
-.logo{flex:none;width:38px;height:38px;border-radius:9px;background:#fff;display:grid;place-items:center;overflow:hidden;
+.logo{flex:none;width:58px;height:38px;border-radius:9px;background:#fff;display:grid;place-items:center;overflow:hidden;
   box-shadow:0 1px 3px rgba(0,0,0,.25);font-family:var(--display);font-weight:800;color:#17202b;font-size:1rem}
-.logo img{width:30px;height:30px;object-fit:contain}
-.scan .logo{width:72px;height:72px;border-radius:16px;font-size:1.8rem}
-.scan .logo img{width:58px;height:58px}
+.logo img{width:50px;height:30px;object-fit:contain}
+.logo.sq{width:38px}.logo.sq img{width:30px}
+.scan .logo{width:150px;height:84px;border-radius:16px;font-size:1.8rem}
+.scan .logo img{width:132px;height:68px}
+.scan .logo.sq{width:84px}.scan .logo.sq img{width:68px}
 .card .tag{position:absolute;top:10px;right:10px;font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;background:rgba(0,0,0,.25);padding:2px 7px;border-radius:99px}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px}
 .empty h2{font-family:var(--display);font-size:1.2rem;margin:0}
@@ -73,8 +75,8 @@ label span.hint{font-weight:400;color:var(--muted);font-size:.8rem}
 .field{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
 .mono{font-family:var(--mono)}
 .logorow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.logorow .logo{width:56px;height:56px;border-radius:12px;border:1px solid var(--line)}
-.logorow .logo img{width:46px;height:46px}
+.logorow .logo{width:84px;height:52px;border-radius:12px;border:1px solid var(--line)}
+.logorow .logo img{width:74px;height:42px}
 .btn.small{flex:none;padding:9px 14px;font-size:.9rem}
 .swatches{display:flex;flex-wrap:wrap;gap:8px}
 .sw{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;background:var(--c)}
@@ -124,7 +126,7 @@ label span.hint{font-weight:400;color:var(--muted);font-size:.8rem}
       <label class="btn" for="imp" style="flex-direction:row;justify-content:center;font-size:1rem">Wczytaj kopię<input id="imp" type="file" accept=".json,application/json" hidden></label>
     </div>
     <p class="msg" id="bMsg" hidden></p>
-    <p style="font-size:.75rem">Wersja 5</p>
+    <p style="font-size:.75rem">Wersja 6</p>
   </details>
 </div>
 
@@ -217,33 +219,53 @@ function guessSite(name){const n=name.toLowerCase();let best=null;
     if(re.test(n)&&(!best||k.length>best[0].length))best=[k,d]}
   return best?best[1]:""}
 function cleanSite(v){return (v||"").trim().toLowerCase().replace(/^https?:\/\//,"").replace(/^www\./,"").split(/[\/?#\s]/)[0]}
-function logoEl(c,el){el=el||document.createElement("div");el.className="logo";el.textContent="";
+function logoEl(c,el){el=el||document.createElement("div");el.className="logo sq";el.textContent="";
   const ini=(c.name.replace(/^przykład:\s*/i,"").match(/[\p{L}\p{N}]/u)||["?"])[0].toUpperCase();
   const site=cleanSite(c.site)||guessSite(c.name.replace(/^przykład:\s*/i,""));
     el.textContent=ini;
   if(c.logo){const img=new Image();img.alt="";img.src=c.logo;el.textContent="";el.append(img);return el}
+  const want=site;el.dataset.site=want||"";
   if(!site)return el;
-  findLogo(site).then(url=>{if(!url)return;const img=new Image();img.alt="";img.referrerPolicy="no-referrer";img.src=url;el.textContent="";el.append(img)});
+  findLogo(site,c.name).then(r=>{if(!r||el.dataset.site!==want)return;const img=new Image();img.alt="";img.referrerPolicy="no-referrer";img.src=r.url;el.textContent="";el.classList.toggle("sq",!r.wide);el.append(img)});
   return el}
 const logoCache={};
 function loadImg(url){return new Promise(res=>{const i=new Image();i.referrerPolicy="no-referrer";
   const t=setTimeout(()=>res(null),6000);
-  i.onload=()=>{clearTimeout(t);res(i.naturalWidth?{url,w:i.naturalWidth}:null)};i.onerror=()=>{clearTimeout(t);res(null)};i.src=url})}
-function findLogo(site){
+  i.onload=()=>{clearTimeout(t);res(i.naturalWidth?{url,w:i.naturalWidth,h:i.naturalHeight}:null)};i.onerror=()=>{clearTimeout(t);res(null)};i.src=url})}
+function rootOf(site){const p=site.split(".");return p.length>2&&/^(com|co|org|net)$/.test(p[p.length-2])?p.slice(-3).join("."):p.slice(-2).join(".")}
+async function wikiLogo(site,name){
+  const root=rootOf(site),word=root.split(".")[0];
+  const terms=[...new Set([word,name.replace(/^przykład:\s*/i,"").trim()].filter(Boolean))];
+  const ids=new Set();
+  for(const t of terms)for(const lang of ["pl","en"]){
+    try{const r=await fetch("https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&origin=*&limit=10&type=item&language="+lang+"&uselang="+lang+"&search="+encodeURIComponent(t));
+      const j=await r.json();(j.search||[]).forEach(x=>ids.add(x.id))}catch(e){}}
+  if(!ids.size)return null;
+  try{const r=await fetch("https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&origin=*&props=claims&ids="+[...ids].slice(0,50).join("|"));
+    const j=await r.json();
+    for(const id of ids){const c=j.entities?.[id]?.claims;if(!c||!c.P154)continue;
+      const sites=(c.P856||[]).map(x=>String(x.mainsnak?.datavalue?.value||"").toLowerCase());
+      if(!sites.some(u=>{const h=cleanSite(u);return h===root||h.endsWith("."+root)||rootOf(h).split(".")[0]===word}))continue;
+      const file=c.P154.find(x=>x.rank==="preferred")?.mainsnak?.datavalue?.value||c.P154[0].mainsnak?.datavalue?.value;
+      if(file)return "https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(file.replace(/ /g,"_"))+"?width=320"}
+  }catch(e){}
+  return null}
+function findLogo(site,name){
   if(logoCache[site])return logoCache[site];
-  let saved=null;try{saved=JSON.parse(localStorage.getItem("logo2:"+site)||"null")}catch(e){}
-  if(saved)return logoCache[site]=Promise.resolve(saved);
+  let saved=null;try{saved=JSON.parse(localStorage.getItem("logo3:"+site)||"null")}catch(e){}
+  if(saved&&saved.url)return logoCache[site]=Promise.resolve(saved);
   const e=encodeURIComponent(site);
-  const srcs=["https://www."+site+"/apple-touch-icon.png",
-    "https://"+site+"/apple-touch-icon.png",
-    "https://www."+site+"/apple-touch-icon-precomposed.png",
-    "https://icon.horse/icon/"+e,
-    "https://www.google.com/s2/favicons?sz=256&domain_url="+encodeURIComponent("https://www."+site),
-    "https://icons.duckduckgo.com/ip3/"+e+".ico"];
-  return logoCache[site]=(async()=>{let best=null;
-    for(const u of srcs){const r=await loadImg(u);if(!r)continue;
-      if(!best||r.w>best.w)best=r;if(r.w>=120)break}
-    if(best){try{localStorage.setItem("logo2:"+site,JSON.stringify(best.url))}catch(e){}return best.url}
+  return logoCache[site]=(async()=>{
+    const save=r=>{try{localStorage.setItem("logo3:"+site,JSON.stringify(r))}catch(x){}return r};
+    const w=await wikiLogo(site,name||"");
+    if(w){const r=await loadImg(w);if(r)return save({url:w,wide:r.w/(r.h||r.w)>1.25})}
+    const srcs=["https://www."+site+"/apple-touch-icon.png","https://"+site+"/apple-touch-icon.png",
+      "https://www."+site+"/apple-touch-icon-precomposed.png","https://icon.horse/icon/"+e,
+      "https://www.google.com/s2/favicons?sz=256&domain_url="+encodeURIComponent("https://www."+site),
+      "https://icons.duckduckgo.com/ip3/"+e+".ico"];
+    let best=null;
+    for(const u of srcs){const r=await loadImg(u);if(!r)continue;if(!best||r.w>best.w)best=r;if(r.w>=120)break}
+    if(best)return save({url:best.url,wide:false});
     delete logoCache[site];return null})()}
 let siteTouched=false,formLogo=null;
 let cards=[],store=null,editing=null,current=null,pickColor=0,wake=null;
